@@ -155,6 +155,129 @@ exports.deleteCustomer = async (req, res) => {
   }
 };
 
+// ✅ Add reminder to a customer
+exports.addReminder = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { date, about } = req.body;
+
+    if (!date || !about) {
+      return res.status(400).json({ error: 'Date and About are required' });
+    }
+
+    const customer = await Customer.findById(customerId);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    customer.reminders.push({ date, about });
+    await customer.save();
+
+    res.json({ message: 'Reminder added successfully', customer });
+  } catch (err) {
+    console.error('❌ Error adding reminder:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ✅ Get customers with reminders on a specific date + pagination
+exports.getRemindersByDate = async (req, res) => {
+  try {
+    const { date, page = 1, limit = 10 } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ error: 'Date query parameter is required' });
+    }
+
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const customers = await Customer.find({
+      reminders: {
+        $elemMatch: {
+          date: { $gte: startOfDay, $lte: endOfDay }
+        }
+      }
+    })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Customer.countDocuments({
+      reminders: {
+        $elemMatch: {
+          date: { $gte: startOfDay, $lte: endOfDay }
+        }
+      }
+    });
+
+    res.json({
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      customers
+    });
+  } catch (err) {
+    console.error('❌ Error fetching reminders:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+exports.updateReminder = async (req, res) => {
+  try {
+    const { customerId, reminderId } = req.params;
+    const { date, about } = req.body;
+
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const reminder = customer.reminders.id(reminderId);
+    if (!reminder) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    // Update only the fields sent from frontend
+    if (date) reminder.date = new Date(date);
+    if (about) reminder.about = about;
+
+    await customer.save();
+
+    res.json({ message: 'Reminder updated successfully', customer });
+  } catch (err) {
+    console.error('❌ Error updating reminder:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
+// ✅ Delete a specific reminder
+exports.deleteReminder = async (req, res) => {
+  try {
+    const { customerId, reminderId } = req.params;
+
+    const customer = await Customer.findByIdAndUpdate(
+      customerId,
+      { $pull: { reminders: { _id: reminderId } } },
+      { new: true }
+    );
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    res.json({ message: 'Reminder deleted successfully', customer });
+  } catch (err) {
+    console.error('❌ Error deleting reminder:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
 exports.updateCustomer = async (req, res) => {
   try {
     const updated = await Customer.findByIdAndUpdate(req.params.id, req.body, {

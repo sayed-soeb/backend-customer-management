@@ -1,9 +1,15 @@
+// models/Customer.js
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: Number, required: true },
   date: { type: Date, required: true }
+});
+
+const reminderSchema = new mongoose.Schema({
+  date: { type: Date, required: true },
+  about: { type: String, required: true }
 });
 
 const customerSchema = new mongoose.Schema({
@@ -20,10 +26,11 @@ const customerSchema = new mongoose.Schema({
   lastContacted: {
     type: Date,
     default: () => new Date()
-  }
+  },
+  reminders: [reminderSchema]
 });
 
-// Auto-update `lastContacted` when document is updated
+// Auto-update `lastContacted` jab document update ho
 customerSchema.pre('findOneAndUpdate', function (next) {
   this.set({ lastContacted: new Date() });
   next();
